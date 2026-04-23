@@ -1,7 +1,9 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
 
 using namespace std;
 
@@ -35,7 +37,49 @@ map<string, Instruction> instructionTable = {
     {"STOP", {14, 1}}
 };
 
-void runPreprocessor(string filename);
+string clean(string line){
+    // remove comentários
+    size_t commentPos = line.find(';');
+    if(commentPos != string::npos) line = line.substr(0, commentPos);
+
+    // converte para maiúsculo
+    transform(line.begin(), line.end(), line.begin(), ::toupper);
+
+    // remove espaços e tabulações
+    size_t first = line.find_first_not_of(" \t\r\n");
+    if(first == string::npos) return "";
+    size_t last = line.find_last_not_of(" \t\r\n");
+    line = line.substr(first, (last - first + 1));
+
+    return line;
+}
+
+void runPreprocessor(string filename){
+    string inputFile = filename + ".asm";
+    string outputFile = filename + ".pre";
+
+    ifstream inFile(inputFile);
+    ofstream outFile(outputFile);
+
+    if(!inFile.is_open()){
+        cout << "Erro: Não foi possível abrir o arquivo.\n";
+        return;
+    }
+
+    string line;
+    cout << "Pre-processamento de " << inputFile << "...\n";
+
+    while(getline(inFile, line)){
+        string cleanLine = clean(line);
+        // se a linha não ficou vazia, gravamos no .pre
+        if(!cleanLine.empty()) outFile << cleanLine << "\n";
+    }
+
+    inFile.close();
+    outFile.close();
+    cout << "Arquivo " << outputFile << " gerado com sucesso!\n";
+};
+
 void runAssembler(string filename);
 void runSimulator(string filename);
 
@@ -67,12 +111,12 @@ int main(int argc, char* argv[]) {
     else if (extension == ".pre"){
         cout << "Modo: Montador\n";
         // deve gerar os arquivos .obj e .pen
-        runAssembler(baseFilename);
+        //runAssembler(baseFilename);
     }
     else if(extension == ".obj"){
         cout << "Modo: Simulador\n";
         // deve simular a execução lendo INPUT do teclado e OUTPUT pro monitor 
-        runSimulator(baseFilename);
+        //runSimulator(baseFilename);
     }
     else{
         cout << "Erro: Extensão nao suportada ()" << extension << ").\n";
