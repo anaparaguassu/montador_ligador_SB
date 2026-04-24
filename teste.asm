@@ -1,10 +1,26 @@
-; teste para rotulos isolados e COPY
+; teste para EQU, IF e reordenacao de secoes
 
-rotulo_isolado:
-    ADD 2      ; O montador deve colocar isso na mesma linha do rotulo
+ZERO: EQU 0
+UM: EQU 1
+DOIS: EQU 2
 
-   sub 3       ; Testando a conversao para maiusculas e remocao de espacos iniciais
+SECTION DATA
+VAR1: SPACE
+VAR2: CONST DOIS
 
-copy_teste: COPY   VAR1 ,   VAR2    ; O montador deve tirar os espacos ao redor da virgula
+SECTION TEXT
+INPUT VAR1
 
-ROTULO_NORMAL: copy X, Y            ; Aqui tambem deve tirar o espaco depois da virgula
+IF UM
+COPY VAR1, VAR2    ; Esta linha DEVE aparecer (UM = 1)
+
+IF ZERO
+JMP FIM            ; Esta linha NAO DEVE aparecer (ZERO = 0)
+
+SUB DOIS           ; O "DOIS" aqui deve virar "2"
+
+IF 0
+ADD DOIS           ; Esta linha NAO DEVE aparecer (0 direto)
+
+OUTPUT VAR2
+FIM: STOP

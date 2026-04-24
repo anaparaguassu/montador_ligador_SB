@@ -114,7 +114,81 @@ void runPreprocessor(string filename){
         formattedLines.push_back(curLine);
     }
 
-    for(const string& s : formattedLines) outFile << s << '\n';
+    // processa EQU, IF e separa seções
+    map<string, string> equTable;
+    vector<string> sectionData, sectionText;
+    int curSection = 0; // 0 = TEXT 1 = DATA
+    bool skipLine = false;
+
+    for(size_t i = 0; i < formattedLines.size(); i++){
+        string curLine = formattedLines[i];
+
+        // lógica do IF => pular linha se condição anterior for falsa
+        if(skipLine){
+            skipLine = false;
+            continue;
+        }
+
+        // diretiva EQU (DOIS: EQU 2)
+        size_t equPos = curLine.find(" EQU ");
+        if(equPos != string::npos){
+            string label = curLine.substr(0, equPos);
+            if(!label.empty() && label.back() == ':') label.pop_back();
+            string val = curLine.substr(equPos + 5);
+            equTable[label] = val;
+            continue;
+        }
+
+        // diretiva IF (IF DOIS)
+        if(curLine.find("IF ") == 0){
+            string condLabel = curLine.substr(3);
+            int condVal = 0;
+            // busca valor na tabela EQU
+            if(equTable.count(condLabel)) condVal = stoi(equTable[condLabel]);
+            else{
+                try{ condVal = stoi(condLabel); }
+                catch(...){}
+            }
+
+            // se for 0, marca para pular a próxima instrução
+            if(condVal == 0) skipLine = true;
+            continue; // não escrever o IF no .pre
+        }
+
+        // substitui valores definidos por EQU no resto do código
+        for(auto const& [label, val] : equTable){
+            size_t pos = 0;
+            while((pos = curLine.find(label, pos)) != string::npos){
+                bool start = (pos == 0 || curLine[pos-1] == ' ' || curLine[pos-1] == ',');
+                size_t lsize = label.size(); 
+                bool end = (pos + lsize == curLine.size() || curLine[pos + lsize] == ' ' || curLine[pos + lsize] == ',');
+
+                if(start && end){
+                    curLine.replace(pos, lsize, val);
+                    pos += val.size();
+                }
+                else pos += lsize;
+            }
+        }
+
+        // identifica as seções
+        if(curLine == "SECTION TEXT"){
+            curSection = 0;
+            sectionText.push_back(curLine);
+        } 
+        else if (curLine == "SECTION DATA"){
+            curSection = 1;
+            sectionData.push_back(curLine);
+        }
+        else{
+            if(curSection) sectionData.push_back(curLine);
+            else sectionText.push_back(curLine);
+        }
+    }
+
+    // grava no arquivo .pre (TEXT primeiro DATA depois)
+    for(const string& s : sectionText) outFile << s << "\n";
+    for(const string& s : sectionData) outFile << s << "\n";
 
     outFile.close();
     cout << "Arquivo " << outputFile << " gerado com sucesso!\n";
