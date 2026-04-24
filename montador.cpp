@@ -67,15 +67,55 @@ void runPreprocessor(string filename){
     }
 
     string line;
+    vector<string> cleanedLines;
     cout << "Pre-processamento de " << inputFile << "...\n";
 
+    // leitura inicial e limpeza básica
     while(getline(inFile, line)){
         string cleanLine = clean(line);
-        // se a linha não ficou vazia, gravamos no .pre
-        if(!cleanLine.empty()) outFile << cleanLine << "\n";
+        // se a linha não ficou vazia, adicionamos no vetor
+        if(!cleanLine.empty()) cleanedLines.push_back(cleanLine);
+    }
+    inFile.close();
+
+    // tratamento de rótulos isolados e COPY
+    vector<string> formattedLines;
+    string outLabel = "";
+    for(size_t i = 0; i < cleanedLines.size(); i++){
+        string curLine = cleanedLines[i];
+
+        // se tem rótulo pendente, junta com a linha atual
+        if(!outLabel.empty()){
+            curLine = outLabel + " " + curLine;
+            outLabel = "";
+        }
+
+        // se a linha tem apenas 1 rótulo
+        if(curLine.back() == ':'){
+            outLabel = curLine;
+            continue;
+        }
+
+        // formatar o COPY tirando espaços da vírgula
+        size_t copyPos = curLine.find("COPY ");
+        if(copyPos != string::npos){
+            size_t commaPos = curLine.find(',', copyPos);
+            if(commaPos != string::npos){
+                // remove espaços antes da vírgula
+                while(commaPos > 0 && curLine[commaPos-1] == ' '){
+                    curLine.erase(commaPos-1, 1);
+                    commaPos--;
+                }
+                // remove espaços depois da vírgula
+                while(commaPos+1 < curLine.size() && curLine[commaPos+1] == ' ') curLine.erase(commaPos+1, 1);
+            }
+        }
+
+        formattedLines.push_back(curLine);
     }
 
-    inFile.close();
+    for(const string& s : formattedLines) outFile << s << '\n';
+
     outFile.close();
     cout << "Arquivo " << outputFile << " gerado com sucesso!\n";
 };
