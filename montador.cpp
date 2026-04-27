@@ -15,7 +15,7 @@ struct Instruction {
 
 // tabela de símbolos
 struct Symbol {
-    int adress;
+    int address;
     bool isDef;
 };
 
@@ -192,9 +192,132 @@ void runPreprocessor(string filename){
 
     outFile.close();
     cout << "Arquivo " << outputFile << " gerado com sucesso!\n";
+    return;
 };
 
-void runAssembler(string filename);
+void runAssembler(string filename){
+    string inputFile = filename + ".pre";
+    string objFile = filename + ".obj";
+    string penFile = filename + ".pen";
+
+    ifstream inFile(inputFile);
+    ofstream outObj(objFile);
+    ofstream outPen(penFile);
+
+    if(!inFile.is_open()){
+        cout << "Erro: Não foi possível abrir o arquivo.\n";
+        return;
+    }
+
+    cout << "Montando " << inputFile << " para gerar .obj e .pen...\n";
+
+    map<string, Symbol> TS;         // tabela de símbolos
+    vector<int> objCode, penCode; 
+    int PC = 0;                     // contador de posição
+    string line;
+
+    while(getline(inFile, line)){
+        // separa em tokens ignorando espaços e vírgulas
+        vector<string> tokens;
+        string t = "";
+        for(char c : line){
+            if(c == ' ' || c == ','){
+                if(!t.empty()){
+                    tokens.push_back(t);
+                    t = "";
+                }
+            }
+            else t += c;
+        }
+        if(!t.empty()) tokens.push_back(t);
+        if(tokens.empty() || tokens[0] == "SECTION") continue;
+
+        // verifica se o primeiro token é um rótulo
+        int tIdx = 0;
+        if(tokens[tIdx].back() == ':'){
+            string label = tokens[tIdx];
+            label.pop_back(); // remove ':'
+            // se o símbolo está pendente, resolve a lista encadeada
+            if(TS.count(label) && !TS[label].isDef){
+                int curRef = TS[label].address;
+                while(curRef != -1){
+                    int nextRef = objCode[curRef];
+                    objCode[curRef] = PC;   // substitui ponteiro pelo endereço real
+                    curRef = nextRef;
+                }
+            }
+            TS[label] = {PC, true}; // marca como definido
+            tIdx++;
+        }
+
+        if(tIdx >= tokens.size()) continue;
+
+        // trata diretivas SPACE e CONST
+        string op = tokens[tIdx];
+        if(op == "SPACE"){
+            objCode.push_back(0);
+            penCode.push_back(0);
+            PC++;
+        }
+        else if(op == "CONST"){
+            int val = 0;
+            string valStr = tokens[tIdx + 1];
+            // identifica se é hexa ou inteiro
+            if(valStr.size() > 2 && valStr.substr(0,2) == "0X") val = stoi(valStr, nullptr, 16);
+            else val = stoi(valStr);
+            objCode.push_back(val);
+            penCode.push_back(val);
+            PC++;
+        }
+        // trata instruções de máquina
+        else if(instructionTable.count(op)){ 
+            Instruction inst = instructionTable[op];
+            objCode.push_back(inst.opcode);
+            penCode.push_back(inst.opcode);
+            PC++;
+
+            // processa os operandos da instrução
+            for(int i = 1; i < inst.size; i++){
+                tIdx++;
+                string operand = tokens[tIdx];
+
+                // se operando for número ou variável
+                if(isdigit(operand[0]) || (operand[0] == '-' && operand.size() > 1)){
+                    int addr = stoi(operand);
+                    objCode.push_back(addr);
+                    penCode.push_back(addr);
+                }
+                // se operando for rótulo
+                else{
+                    if(TS.count(operand)){
+                        objCode.push_back(TS[operand].address);
+                        penCode.push_back(TS[operand].address);
+                        // rótulo conhecido mas indefinido = nova pendência
+                        if(!TS[operand].isDef) TS[operand].address = PC; // atualiza a cabeça da lista pro PC atual
+                    }
+                    else{ // rótulo visto pela primeira vez (inicia lista de pendências)
+                        TS[operand] = {-1, false}; // -1 fim da cadeia
+                        objCode.push_back(-1);
+                        penCode.push_back(-1);
+                        TS[operand].address = PC;
+                    }
+                }
+                PC++;
+            }
+        }
+    }
+
+    inFile.close();
+    // gravação no arquivos => .obj recebe lista corrigida e .pen recebe lista original
+    for(size_t i = 0; i < objCode.size(); i++) outObj << objCode[i] << (i == objCode.size() - 1 ? "" : " ");
+    for(size_t i = 0; i < penCode.size(); i++) outPen << penCode[i] << (i == penCode.size() - 1 ? "" : " ");
+
+    outObj.close();
+    outPen.close();
+    cout << "Arquivos " << objFile << " e " << penFile << " gerados com sucesso!\n";
+    return;
+}
+
 void runSimulator(string filename);
 
 int main(int argc, char* argv[]) {
@@ -225,7 +348,7 @@ int main(int argc, char* argv[]) {
     else if (extension == ".pre"){
         cout << "Modo: Montador\n";
         // deve gerar os arquivos .obj e .pen
-        //runAssembler(baseFilename);
+        runAssembler(baseFilename);
     }
     else if(extension == ".obj"){
         cout << "Modo: Simulador\n";
