@@ -24,6 +24,7 @@ map<string, Instruction> instructionTable = {
     {"ADD", {1, 2}},
     {"SUB", {2, 2}},
     {"MUL", {3, 2}},
+    {"MULT", {3, 2}}, // cobre erro de digitação
     {"DIV", {4, 2}},
     {"JMP", {5, 2}},
     {"JMPN", {6, 2}},
@@ -318,7 +319,104 @@ void runAssembler(string filename){
     return;
 }
 
-void runSimulator(string filename);
+void runSimulator(string filename){
+    string objFile = filename + ".obj";
+    ifstream inFile(objFile);
+
+    if(!inFile.is_open()){
+       cout << "Erro: Não foi possível abrir o arquivo.\n";
+        return; 
+    }
+
+    cout << "Iniciando simulação de " << objFile << "...\n";
+    cout << "-------------------------------------------------\n";
+
+    vector<int> mem;
+    int val;
+    // lê os inteiros do .obj para a memória
+    while(inFile >> val) mem.push_back(val);
+    inFile.close();
+
+    if(mem.empty()){
+        cout << "Erro: Arquivo objeto vazio.\n";
+        return;
+    }
+
+    int PC = 0;     // contador
+    int ACC = 0;    // acumulador
+    bool running = true;
+
+    while(running && PC < mem.size()){
+        int opcode = mem[PC];
+
+        switch (opcode){
+            case 1:     // ADD
+                ACC += mem[mem[PC+1]];
+                PC += 2;
+                break;
+            case 2:     // SUB
+                ACC -= mem[mem[PC+1]];
+                PC += 2;
+                break;
+            case 3:     // MUL
+                ACC *= mem[mem[PC+1]];
+                PC += 2;
+                break;
+            case 4:     // DIV
+                ACC /= mem[mem[PC+1]];
+                PC += 2;
+                break;
+            case 5:     // JMP
+                PC = mem[PC+1];
+                break;
+            case 6:     // JMPN
+                if(ACC < 0) PC = mem[PC+1];
+                else PC += 2;
+                break;
+            case 7:     // JMPP
+                if(ACC > 0) PC = mem[PC+1];
+                else PC += 2;
+                break;
+            case 8:     // JMPZ
+                if(ACC == 0) PC = mem[PC+1];
+                else PC += 2;
+                break;
+            case 9:     // COPY
+                mem[mem[PC+2]] = mem[mem[PC+1]];
+                PC += 3;
+                break;
+            case 10:    // LOAD
+                ACC = mem[mem[PC+1]];
+                PC += 2;
+                break;
+            case 11:    // STORE
+                mem[mem[PC+1]] = ACC;
+                PC += 2;
+                break;
+            case 12:    // INPUT
+                cout << "INPUT (Digite um valor): ";
+                cin >> mem[mem[PC+1]];
+                PC += 2;
+                break;
+            case 13:    // OUTPUT
+                cout << "OUTPUT: " << mem[mem[PC+1]] << "\n";
+                PC += 2;
+                break;
+            case 14:    // STOP
+                running = false;
+                PC++;
+                break;
+            default:
+                cout << "Erro na execução: opcode desconhecido (" << opcode << ") no PC (" << PC << ").\n";
+                running = false;
+                break;
+        }
+    }
+
+    cout << "-------------------------------------------------\n";
+    cout << "Simulação finalizada!\n";
+    return;
+}
 
 int main(int argc, char* argv[]) {
     // verifica se há o nome do arquivo
@@ -353,7 +451,7 @@ int main(int argc, char* argv[]) {
     else if(extension == ".obj"){
         cout << "Modo: Simulador\n";
         // deve simular a execução lendo INPUT do teclado e OUTPUT pro monitor 
-        //runSimulator(baseFilename);
+        runSimulator(baseFilename);
     }
     else{
         cout << "Erro: Extensão nao suportada ()" << extension << ").\n";
